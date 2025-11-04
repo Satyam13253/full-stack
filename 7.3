@@ -1,0 +1,75 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+const PORT = 3000;
+
+app.get('/', (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Real-time Chat</title>
+<style>
+  body { font-family: Arial, sans-serif; }
+  ul { list-style: none; padding: 0; }
+  li { margin: 5px 0; }
+  #messageInput { width: 80%; padding: 5px; }
+  button { padding: 5px; }
+</style>
+</head>
+<body>
+<h2>Chat Room</h2>
+<ul id="messages"></ul>
+<input id="messageInput" autocomplete="off" placeholder="Type a message..." />
+<button onclick="sendMessage()">Send</button>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  const messages = document.getElementById('messages');
+  const input = document.getElementById('messageInput');
+
+  function sendMessage() {
+    const msg = input.value;
+    if(msg.trim() === '') return;
+    socket.emit('chat message', msg);
+    input.value = '';
+  }
+
+  socket.on('chat message', (msg) => {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    messages.appendChild(li);
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+</script>
+</body>
+</html>
+    `);
+});
+
+io.on('connection', (socket) => {
+    console.log('A user connected');
+
+    socket.on('chat message', (msg) => {
+        io.emit('chat message', msg);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('A user disconnected');
+    });
+});
+
+server.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
