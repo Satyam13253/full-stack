@@ -1,0 +1,70 @@
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const port = 3000;
+
+// Initialize seats
+let seats = {};
+const TOTAL_SEATS = 10;
+for (let i = 1; i <= TOTAL_SEATS; i++) {
+    seats[i] = { id: i, booked: false, lockedBy: null };
+}
+
+// Lock timeout in milliseconds
+const LOCK_TIMEOUT = 5000;
+
+// Helper function to lock a seat
+function lockSeat(seatId, userId) {
+    const seat = seats[seatId];
+    if (!seat) return { success: false, message: 'Seat not found' };
+    if (seat.booked) return { success: false, message: 'Seat already booked' };
+    if (seat.lockedBy && seat.lockedBy !== userId) return { success: false, message: 'Seat locked by another user' };
+
+    seat.lockedBy = userId;
+    setTimeout(() => {
+        if (seat.lockedBy === userId) seat.lockedBy = null;
+    }, LOCK_TIMEOUT);
+
+    return { success: true, message: 'Seat locked successfully' };
+}
+
+// Get all seats
+app.get('/seats', (req, res) => {
+    res.json(seats);
+});
+
+// Lock a seat
+app.post('/lock', (req, res) => {
+    const { seatId, userId } = req.body;
+    const result = lockSeat(seatId, userId);
+    res.json(result);
+});
+
+// Book a seat
+app.post('/book', (req, res) => {
+    const { seatId, userId } = req.body;
+    const seat = seats[seatId];
+    if (!seat) return res.status(404).json({ success: false, message: 'Seat not found' });
+    if (seat.booked) return res.status(400).json({ success: false, message: 'Seat already booked' });
+    if (seat.lockedBy !== userId) return res.status(400).json({ success: false, message: 'Seat is not locked by you' });
+
+    seat.booked = true;
+    seat.lockedBy = null;
+    res.json({ success: true, message: `Seat ${seatId} booked successfully` });
+});
+
+// Release lock manually
+app.post('/release', (req, res) => {
+    const { seatId, userId } = req.body;
+    const seat = seats[seatId];
+    if (!seat) return res.status(404).json({ success: false, message: 'Seat not found' });
+    if (seat.lockedBy !== userId) return res.status(400).json({ success: false, message: 'You do not hold the lock' });
+
+    seat.lockedBy = null;
+    res.json({ success: true, message: `Seat ${seatId} lock released` });
+});
+
+app.listen(port, () => {
+    console.log(`Ticket booking system running at http://localhost:${port}`);
+});
