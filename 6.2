@@ -1,0 +1,76 @@
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+
+const JWT_SECRET = 'my_jwt_secret_key';
+
+// Mock user database
+const users = [
+    { id: 1, username: 'user1', password: 'password1' },
+    { id: 2, username: 'user2', password: 'password2' }
+];
+
+// Mock accounts database
+let accounts = [
+    { id: 1, ownerId: 1, balance: 1000 },
+    { id: 2, ownerId: 2, balance: 500 }
+];
+
+// Generate JWT token
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const user = users.find(u => u.username === username && u.password === password);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+});
+
+// JWT authentication middleware
+const authenticate = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Invalid token format' });
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        res.status(403).json({ error: 'Token is invalid or expired' });
+    }
+};
+
+// Get account balance
+app.get('/accounts/:id', authenticate, (req, res) => {
+    const account = accounts.find(a => a.id === parseInt(req.params.id));
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    if (account.ownerId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
+
+    res.json({ balance: account.balance });
+});
+
+// Transfer money between accounts
+app.post('/accounts/transfer', authenticate, (req, res) => {
+    const { fromId, toId, amount } = req.body;
+    const fromAccount = accounts.find(a => a.id === fromId);
+    const toAccount = accounts.find(a => a.id === toId);
+
+    if (!fromAccount || !toAccount) return res.status(404).json({ error: 'Account not found' });
+    if (fromAccount.ownerId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
+    if (fromAccount.balance < amount) return res.status(400).json({ error: 'Insufficient funds' });
+
+    fromAccount.balance -= amount;
+    toAccount.balance += amount;
+
+    res.json({ message: 'Transfer successful', fromAccount, toAccount });
+});
+
+app.listen(port, () => {
+    console.log(`Banking API running at http://localhost:${port}`);
+});
