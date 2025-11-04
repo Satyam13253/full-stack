@@ -1,0 +1,58 @@
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+
+let cards = []; // In-memory card collection
+
+// Get all cards
+app.get('/cards', (req, res) => {
+    res.json(cards);
+});
+
+// Get a card by ID
+app.get('/cards/:id', (req, res) => {
+    const card = cards.find(c => c.id === parseInt(req.params.id));
+    if (!card) return res.status(404).json({ message: 'Card not found' });
+    res.json(card);
+});
+
+// Add a new card
+app.post('/cards', (req, res) => {
+    const { id, suit, value } = req.body;
+    if (!id || !suit || !value) {
+        return res.status(400).json({ message: 'ID, suit, and value are required' });
+    }
+    const exists = cards.find(c => c.id === id);
+    if (exists) return res.status(400).json({ message: 'Card with this ID already exists' });
+
+    const newCard = { id, suit, value };
+    cards.push(newCard);
+    res.status(201).json(newCard);
+});
+
+// Update a card by ID
+app.put('/cards/:id', (req, res) => {
+    const card = cards.find(c => c.id === parseInt(req.params.id));
+    if (!card) return res.status(404).json({ message: 'Card not found' });
+
+    const { suit, value } = req.body;
+    if (suit) card.suit = suit;
+    if (value) card.value = value;
+
+    res.json(card);
+});
+
+// Delete a card by ID
+app.delete('/cards/:id', (req, res) => {
+    const index = cards.findIndex(c => c.id === parseInt(req.params.id));
+    if (index === -1) return res.status(404).json({ message: 'Card not found' });
+
+    const deletedCard = cards.splice(index, 1);
+    res.json({ message: 'Card deleted', card: deletedCard[0] });
+});
+
+app.listen(port, () => {
+    console.log(`Playing Card API running at http://localhost:${port}`);
+});
