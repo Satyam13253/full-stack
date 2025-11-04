@@ -1,0 +1,43 @@
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+
+// Logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
+
+// Simple authentication middleware
+const authMiddleware = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+    if (token !== 'my-secret-token') {
+        return res.status(403).json({ error: 'Invalid token' });
+    }
+    next();
+};
+
+// Public route (no auth required)
+app.get('/', (req, res) => {
+    res.send('Welcome to the public API!');
+});
+
+// Protected route (auth required)
+app.get('/dashboard', authMiddleware, (req, res) => {
+    res.send('Welcome to the protected dashboard!');
+});
+
+// Another protected route with POST
+app.post('/update', authMiddleware, (req, res) => {
+    const { data } = req.body;
+    res.json({ message: 'Data updated successfully', data });
+});
+
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+});
