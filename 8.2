@@ -1,0 +1,89 @@
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
+const app = express();
+const PORT = 5000;
+const SECRET = 'mysecretkey';
+
+app.use(bodyParser.json());
+
+const users = [
+  { id: 1, username: 'admin', password: 'admin', role: 'admin' },
+  { id: 2, username: 'mod', password: 'mod', role: 'moderator' },
+  { id: 3, username: 'user', password: 'user', role: 'user' }
+];
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  const user = users.find(u => u.username === username && u.password === password);
+  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+  const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: '1h' });
+  res.json({ token, role: user.role });
+});
+
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: 'No token provided' });
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ message: 'Invalid token' });
+    req.user = decoded;
+    next();
+  });
+};
+
+const authorize = (...roles) => (req, res, next) => {
+  if (!roles.includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
+  next();
+};
+
+app.get('/admin', authenticate, authorize('admin'), (req, res) => res.send('Welcome Admin!'));
+app.get('/moderator', authenticate, authorize('admin','moderator'), (req, res) => res.send('Welcome Moderator!'));
+app.get('/user', authenticate, authorize('admin','moderator','user'), (req, res) => res.send('Welcome User!'));
+
+app.get('/', (req, res) => {
+  res.send(`
+  <!DOCTYPE html>
+  <html>
+  <head><title>RBAC Demo</title></head>
+  <body>
+  <h1>Login</h1>
+  <input id="username" placeholder="Username"/>
+  <input id="password" placeholder="Password" type="password"/>
+  <button onclick="login()">Login</button>
+  <p id="msg"></p>
+  <div id="links" style="display:none;">
+    <button onclick="getPage('/admin')">Admin Page</button>
+    <button onclick="getPage('/moderator')">Moderator Page</button>
+    <button onclick="getPage('/user')">User Page</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+  <script>
+    let token = '';
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      fetch('/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username, password})
+      })
+      .then(r=>r.json())
+      .then(data => {
+        if(data.token){ token = data.token; document.getElementById('msg').innerText='Logged in as '+data.role; document.getElementById('links').style.display='block'; }
+        else document.getElementById('msg').innerText=data.message;
+      });
+    }
+    function getPage(path){
+      fetch(path, { headers:{'Authorization':'Bearer '+token}})
+      .then(r=>r.text())
+      .then(txt=>alert(txt))
+      .catch(e=>alert('Access denied'));
+    }
+    function logout(){ token=''; document.getElementById('links').style.display='none'; document.getElementById('msg').innerText='Logged out';}
+  </script>
+  </body>
+  </html>
+  `);
+});
+
+app.listen(PORT, () => console.log('Server running on http://localhost:'+PORT));
