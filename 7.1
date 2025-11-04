@@ -1,0 +1,66 @@
+const express = require('express');
+const path = require('path');
+const app = express();
+const port = 5000;
+
+app.use(express.json());
+
+// Sample API data
+const products = [
+  { id: 1, name: 'Laptop', price: 1200 },
+  { id: 2, name: 'Phone', price: 800 },
+  { id: 3, name: 'Tablet', price: 500 }
+];
+
+// API route
+app.get('/api/products', (req, res) => {
+  res.json(products);
+});
+
+// Serve a minimal React app
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>React + Express Example</title>
+        <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+        <style>
+          body { font-family: Arial; padding: 20px; }
+        </style>
+      </head>
+      <body>
+        <div id="root"></div>
+        <script type="text/javascript">
+          const { useState, useEffect } = React;
+          
+          function App() {
+            const [products, setProducts] = useState([]);
+            
+            useEffect(() => {
+              axios.get('/api/products')
+                .then(res => setProducts(res.data))
+                .catch(err => console.error(err));
+            }, []);
+            
+            return React.createElement('div', null,
+              React.createElement('h1', null, 'Product List'),
+              React.createElement('ul', null, 
+                products.map(p => React.createElement('li', { key: p.id }, p.name + ' - $' + p.price))
+              )
+            );
+          }
+
+          const root = ReactDOM.createRoot(document.getElementById('root'));
+          root.render(React.createElement(App));
+        </script>
+      </body>
+    </html>
+  `);
+});
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
